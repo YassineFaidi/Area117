@@ -1,6 +1,6 @@
 const socket = io('');
 
-let myname, myimg, myPublicKey, myPrivateKey, onlinePeers, peersImg = {}, peerConnections = {}, dataChannels = {}, bufferedIceCandidates = {}, conversations = {}, files = {}, inLatest = [], bufferedFileName;
+let myname, myimg, onlinePeers, peersImg = {}, peerConnections = {}, dataChannels = {}, bufferedIceCandidates = {}, conversations = {}, files = {}, inLatest = [], bufferedFileName;
 
 const mediaQuerySmall = window.matchMedia('(max-width: 470px)');
 const mediaQueryMedium = window.matchMedia('(max-width: 810px)');
@@ -211,7 +211,7 @@ function setupDataChannel(dataChannel, peer) {
         alert("Data channel opened with [ " + peer + " ] ");
     };
 
-    dataChannel.onmessage = async event => {
+    dataChannel.onmessage = event => {
         const peernameh3 = document.getElementById("peername");
         if (!conversations[peer]) {
             if (peernameh3) {
@@ -226,7 +226,7 @@ function setupDataChannel(dataChannel, peer) {
             }
         }
 
-        let message = event.data;
+        const message = event.data;
 
         if (typeof (message) === 'string' && message.substring(0, 20) === "_AREA117@filename : ") {
             bufferedFileName = message.substring(20);
@@ -237,8 +237,6 @@ function setupDataChannel(dataChannel, peer) {
                     files[uniqueId] = bufferedFileName;
                 }
             });
-        } else {
-            message = await decryptMessage(myPrivateKey, message);
         }
 
         const currentTime = new Date().toLocaleTimeString();
@@ -434,11 +432,10 @@ function sendFile(file, fileName) {
     }
 }
 
-async function sendMsg() {
+function sendMsg() {
     const peernameh3 = document.getElementById("peername");
     if (peernameh3) {
         const peername = peernameh3.textContent;
-        console.log("Peer public key : ")
         const message = chatInput.value;
 
         if (message !== '') {
@@ -449,8 +446,7 @@ async function sendMsg() {
             conversations[peername].push({ message: message, type: 'sent', time: currentTime });
 
             if ((peername in dataChannels) && (dataChannels[peername].readyState === 'open')) {
-                const encryptedMessage = await encryptMessage(onlinePeers[peername][2], message);
-                dataChannels[peername].send(encryptedMessage);
+                dataChannels[peername].send(message);
                 UpdateChatMessages(peername);
                 chatInput.value = '';
                 chatInput.focus();
@@ -636,139 +632,19 @@ form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const username = form.elements['Username'].value;
     const file = form.elements['Userimage'].files[0];
-    let userimage;
 
     if (file) {
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = () => {
-            userimage = reader.result;
+            const userimage = reader.result;
+            socket.emit("login_request", { username: username, userimage: userimage });
         };
         reader.onerror = (error) => {
             console.error('Error: ', error);
         };
     } else {
-        userimage = "./img/user2.jpeg";
+        const userimage = "./img/user2.jpeg";
+        socket.emit("login_request", { username: username, userimage: userimage });
     }
-    const { publicKey, privateKey } = await generateRSAKeys();
-
-    myPrivateKey = privateKey;
-    myPublicKey = publicKey;
-
-    socket.emit("login_request", { username: username, userimage: userimage, publicKey: myPublicKey });
 });
-
-async function generateRSAKeys() {
-    const keyPair = await window.crypto.subtle.generateKey(
-        {
-            name: "RSA-OAEP",
-            modulusLength: 2048,
-            publicExponent: new Uint8Array([1, 0, 1]),
-            hash: "SHA-256",
-        },
-        true,
-        ["encrypt", "decrypt"]
-    );
-
-    const publicKey = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
-    const privateKey = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
-
-    return {
-        publicKey: bufferToPem(publicKey, "PUBLIC KEY"),
-        privateKey: bufferToPem(privateKey, "PRIVATE KEY"),
-    };
-}
-
-function bufferToPem(buffer, label) {
-    const base64String = arrayBufferToBase64(buffer);
-    const pemString = `-----BEGIN ${label}-----\n${base64String.match(/.{1,64}/g).join('\n')}\n-----END ${label}-----`;
-    return pemString;
-}
-
-function pemToBase64(pem) {
-    return pem.replace(/-----BEGIN (PUBLIC|PRIVATE) KEY-----|-----END (PUBLIC|PRIVATE) KEY-----|\n/g, '').trim();
-}
-
-function arrayBufferToBase64(buffer) {
-    const bytes = new Uint8Array(buffer);
-    const binary = bytes.reduce((data, byte) => data + String.fromCharCode(byte), '');
-    return window.btoa(binary);
-}
-
-function base64ToArrayBuffer(base64) {
-    const binaryString = window.atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
-}
-
-function str2ab(str) {
-    const buf = new ArrayBuffer(str.length);
-    const bufView = new Uint8Array(buf);
-    for (let i = 0, strLen = str.length; i < strLen; i++) {
-        bufView[i] = str.charCodeAt(i);
-    }
-    return buf;
-}
-
-
-
-async function encryptMessage(publicKeyPem, message) {
-    const publicKey = await importPublicKey(publicKeyPem);
-    const encryptedMessage = await window.crypto.subtle.encrypt(
-        { name: "RSA-OAEP" },
-        publicKey,
-        new TextEncoder().encode(message)
-    );
-
-    return arrayBufferToBase64(encryptedMessage);
-}
-
-async function importPublicKey(pem) {
-    const binaryDerString = window.atob(pemToBase64(pem));
-    const binaryDer = str2ab(binaryDerString);
-
-    return window.crypto.subtle.importKey(
-        "spki",
-        binaryDer,
-        {
-            name: "RSA-OAEP",
-            hash: "SHA-256",
-        },
-        true,
-        ["encrypt"]
-    );
-}
-
-async function decryptMessage(privateKeyPem, encryptedMessage) {
-    const privateKey = await importPrivateKey(privateKeyPem);
-    const decryptedMessage = await window.crypto.subtle.decrypt(
-        { name: "RSA-OAEP" },
-        privateKey,
-        base64ToArrayBuffer(encryptedMessage)
-    );
-
-    return new TextDecoder().decode(decryptedMessage);
-}
-
-async function importPrivateKey(pem) {
-    const binaryDerString = window.atob(pemToBase64(pem));
-    const binaryDer = str2ab(binaryDerString);
-
-    return window.crypto.subtle.importKey(
-        "pkcs8",
-        binaryDer,
-        {
-            name: "RSA-OAEP",
-            hash: "SHA-256",
-        },
-        true,
-        ["decrypt"]
-    );
-}
-
-
-
