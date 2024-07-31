@@ -19,16 +19,18 @@ io.on('connection', (socket) => {
     socket.on('login_request', (data) => {
         const username = data.username;
         const userimage = data.userimage;
+        const publicKey = data.publicKey;
 
         if (peers[username]) {
             socket.emit("change_username", username);
         } else {
             socket.name = username;
             socket.profile = userimage;
+            socket.publicKey = publicKey;
             socket.status = 'online';
             socket.connectedWith = null;
 
-            peers[username] = [userimage, socket.status];
+            peers[username] = [userimage, socket.status, socket.publicKey];
             sockets[username] = socket;
 
             socket.emit("actual_user_info", { myname: username, myimg: userimage });
