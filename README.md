@@ -127,7 +127,7 @@ Ensure you have the following installed on your development machine:
 
 ## License
 
-Distributed under the MIT License. See `LICENSE.txt` for more information.
+This project is open source and available under the [MIT License](LICENSE).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
