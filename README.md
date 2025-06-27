@@ -133,7 +133,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ## Contact
 
-Yassine Faidi: [@my_linkedin](https://www.linkedin.com/in/yassine-faidi-853671247/) - yassinefaidi133@gmail.com
+Yassine Faidi: [@my_linkedin](https://www.linkedin.com/in/yassine-faidi-853671247/) - yassine.faidi.117@gmail.com
 
 Project Link: [https://github.com/YassineFaidi/Area117.git](https://github.com/YassineFaidi/Area117.git)
 
